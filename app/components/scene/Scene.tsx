@@ -1,9 +1,14 @@
 import { ContactShadows, Environment, CameraControls } from "@react-three/drei";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Avatar } from "./Avatar";
+import { useControls } from "leva";
+import { getIndexedDb, LocalAvatar } from "~/utils/indexedDB.client";
 
 export const Scene = () => {
   const cameraControls = useRef<CameraControls | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+
+  const [avatars, setAvatars] = useState<LocalAvatar[]>([]);
 
   useEffect(() => {
     cameraControls.current?.setLookAt(
@@ -16,11 +21,30 @@ export const Scene = () => {
     );
   }, [cameraControls]);
 
+  useEffect(() => {
+    getIndexedDb().avatars.toArray().then(setAvatars);
+  }, []);
+
+  useControls(
+    "Change Avatar",
+    {
+      models: {
+        value: "my id",
+        options: avatars.map((e) => e.avatarId),
+        onChange: (val: string) => {
+          const avatar = avatars.find((e) => e.avatarId === val);
+          avatar && setAvatarUrl(URL.createObjectURL(avatar.model));
+        },
+      },
+    },
+    [avatars]
+  );
+
   return (
     <>
       <CameraControls ref={cameraControls} />
       <Environment preset="city" />
-      <Avatar />
+      {avatarUrl && <Avatar key={avatarUrl} url={avatarUrl} />}
       <ContactShadows opacity={0.7} />
     </>
   );

@@ -15,29 +15,32 @@ import { useChat } from "../chat/ChatProvider";
 
 type GLTFResult = GLTF & {
   nodes: {
-    EyeLeft: THREE.SkinnedMesh;
-    EyeRight: THREE.SkinnedMesh;
-    Wolf3D_Head: THREE.SkinnedMesh;
-    Wolf3D_Teeth: THREE.SkinnedMesh;
-    Wolf3D_Hair: THREE.SkinnedMesh;
-    Wolf3D_Body: THREE.SkinnedMesh;
-    Wolf3D_Outfit_Bottom: THREE.SkinnedMesh;
-    Wolf3D_Outfit_Footwear: THREE.SkinnedMesh;
-    Wolf3D_Outfit_Top: THREE.SkinnedMesh;
+    Body_Mesh: THREE.SkinnedMesh;
+    Eye_Mesh: THREE.SkinnedMesh;
+    EyeAO_Mesh: THREE.SkinnedMesh;
+    Eyelash_Mesh: THREE.SkinnedMesh;
+    Head_Mesh: THREE.SkinnedMesh;
+    Teeth_Mesh: THREE.SkinnedMesh;
+    Tongue_Mesh: THREE.SkinnedMesh;
+    avaturn_hair_0: THREE.SkinnedMesh;
+    avaturn_hair_1: THREE.SkinnedMesh;
+    avaturn_shoes_0: THREE.SkinnedMesh;
+    avaturn_look_0: THREE.SkinnedMesh;
     Hips: THREE.Bone;
   };
   materials: {
-    Wolf3D_Eye: THREE.MeshStandardMaterial;
-    Wolf3D_Skin: THREE.MeshStandardMaterial;
-    Wolf3D_Teeth: THREE.MeshStandardMaterial;
-    Wolf3D_Hair: THREE.MeshStandardMaterial;
-    Wolf3D_Body: THREE.MeshStandardMaterial;
-    Wolf3D_Outfit_Bottom: THREE.MeshStandardMaterial;
-    Wolf3D_Outfit_Footwear: THREE.MeshStandardMaterial;
-    Wolf3D_Outfit_Top: THREE.MeshStandardMaterial;
+    Body: THREE.MeshStandardMaterial;
+    Eyes: THREE.MeshStandardMaterial;
+    EyeAO: THREE.MeshStandardMaterial;
+    Eyelash: THREE.MeshStandardMaterial;
+    Head: THREE.MeshStandardMaterial;
+    Teeth: THREE.MeshStandardMaterial;
+    avaturn_hair_0_material: THREE.MeshStandardMaterial;
+    avaturn_hair_1_material: THREE.MeshStandardMaterial;
+    avaturn_shoes_0_material: THREE.MeshStandardMaterial;
+    avaturn_look_0_material: THREE.MeshStandardMaterial;
   };
 };
-
 let setupMode = false;
 
 const corresponding = {
@@ -58,14 +61,14 @@ const corresponding = {
   19: "viseme_PP",
 } as { [x: string]: string };
 
-export function Avatar(props: JSX.IntrinsicElements["group"]) {
-  const { nodes, materials, scene } = useGLTF(
-    "/models/67ced08b15151efc82ffba2e.glb"
-  ) as GLTFResult;
+export function Avatar(
+  props: JSX.IntrinsicElements["group"] & { url: string }
+) {
+  const model = useRef<THREE.Group>(null);
 
-  const { animations } = useGLTF("/models/animations.glb");
+  const { nodes, materials, scene } = useGLTF(props.url) as GLTFResult;
 
-  const model = useRef<THREE.Group<THREE.Object3DEventMap> | null>(null);
+  const { animations } = useGLTF("/models/avaturn.animations.glb");
 
   const { actions } = useAnimations(animations, model);
 
@@ -77,9 +80,20 @@ export function Avatar(props: JSX.IntrinsicElements["group"]) {
 
   const { reply } = useChat();
 
+  const mixer = useRef<THREE.AnimationMixer>();
+
   const [animation, setAnimation] = useState<string>(() =>
-    animations.find((e) => e.name === "Idle") ? "Idle" : animations[0].name
+    animations.find((e) => e.name === "idle") ? "idle" : animations[0].name
   );
+
+  useEffect(() => {
+    useGLTF.preload("/models/avaturn.animations.glb");
+
+    () => {
+      actions[animation]?.fadeOut(2);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const facialExpressions = {
     default: {},
@@ -159,11 +173,14 @@ export function Avatar(props: JSX.IntrinsicElements["group"]) {
     };
   }, [reply]);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
+    if (mixer && model.current) {
+      mixer.current?.update(delta);
+    }
     if (setupMode) {
       return;
     }
-    Object.keys(nodes.EyeLeft.morphTargetDictionary ?? {}).forEach((key) => {
+    Object.keys(nodes.Head_Mesh.morphTargetDictionary ?? {}).forEach((key) => {
       const mapping = facialExpressions[facialExpression];
       if (mapping && mapping[key] != null) {
         lerp(key, mapping[key], 0.1);
@@ -190,13 +207,12 @@ export function Avatar(props: JSX.IntrinsicElements["group"]) {
 
   const [, set] = useControls("MorphTargets", () => {
     const options: Schema = {};
-    console.log(Object.keys(nodes.EyeLeft.morphTargetDictionary!));
-    Object.entries(nodes.EyeLeft.morphTargetDictionary ?? {}).forEach(
+    Object.entries(nodes.Head_Mesh.morphTargetDictionary ?? {}).forEach(
       ([key, val]) => {
         options[key] = {
           label: key,
           value: 0,
-          min: nodes.EyeLeft.morphTargetInfluences?.[val] ?? 0,
+          min: nodes.Head_Mesh.morphTargetInfluences?.[val] ?? 0,
           max: 1,
           onChange: (y: number) => {
             setupMode && lerp(key, y, 1);
@@ -208,76 +224,319 @@ export function Avatar(props: JSX.IntrinsicElements["group"]) {
   });
 
   useEffect(() => {
-    actions[animation]?.reset().fadeIn(0.5).play();
-
+    if (actions && Object.keys(actions).length > 0 && model.current) {
+      console.log("play", animation, actions);
+      actions[animation]?.reset().fadeIn(0.5).play();
+    }
     return () => {
       actions[animation]?.fadeOut(0.5);
     };
   }, [animation, actions]);
 
   return (
-    <group {...props} dispose={null} ref={model}>
-      <primitive object={nodes.Hips} />
-      <skinnedMesh
-        name="EyeLeft"
-        geometry={nodes.EyeLeft.geometry}
-        material={materials.Wolf3D_Eye}
-        skeleton={nodes.EyeLeft.skeleton}
-        morphTargetDictionary={nodes.EyeLeft.morphTargetDictionary}
-        morphTargetInfluences={nodes.EyeLeft.morphTargetInfluences}
-      />
-      <skinnedMesh
-        name="EyeRight"
-        geometry={nodes.EyeRight.geometry}
-        material={materials.Wolf3D_Eye}
-        skeleton={nodes.EyeRight.skeleton}
-        morphTargetDictionary={nodes.EyeRight.morphTargetDictionary}
-        morphTargetInfluences={nodes.EyeRight.morphTargetInfluences}
-      />
-      <skinnedMesh
-        name="Wolf3D_Head"
-        geometry={nodes.Wolf3D_Head.geometry}
-        material={materials.Wolf3D_Skin}
-        skeleton={nodes.Wolf3D_Head.skeleton}
-        morphTargetDictionary={nodes.Wolf3D_Head.morphTargetDictionary}
-        morphTargetInfluences={nodes.Wolf3D_Head.morphTargetInfluences}
-      />
-      <skinnedMesh
-        name="Wolf3D_Teeth"
-        geometry={nodes.Wolf3D_Teeth.geometry}
-        material={materials.Wolf3D_Teeth}
-        skeleton={nodes.Wolf3D_Teeth.skeleton}
-        morphTargetDictionary={nodes.Wolf3D_Teeth.morphTargetDictionary}
-        morphTargetInfluences={nodes.Wolf3D_Teeth.morphTargetInfluences}
-      />
-      <skinnedMesh
-        geometry={nodes.Wolf3D_Hair.geometry}
-        material={materials.Wolf3D_Hair}
-        skeleton={nodes.Wolf3D_Hair.skeleton}
-      />
-      <skinnedMesh
-        geometry={nodes.Wolf3D_Body.geometry}
-        material={materials.Wolf3D_Body}
-        skeleton={nodes.Wolf3D_Body.skeleton}
-      />
-      <skinnedMesh
-        geometry={nodes.Wolf3D_Outfit_Bottom.geometry}
-        material={materials.Wolf3D_Outfit_Bottom}
-        skeleton={nodes.Wolf3D_Outfit_Bottom.skeleton}
-      />
-      <skinnedMesh
-        geometry={nodes.Wolf3D_Outfit_Footwear.geometry}
-        material={materials.Wolf3D_Outfit_Footwear}
-        skeleton={nodes.Wolf3D_Outfit_Footwear.skeleton}
-      />
-      <skinnedMesh
-        geometry={nodes.Wolf3D_Outfit_Top.geometry}
-        material={materials.Wolf3D_Outfit_Top}
-        skeleton={nodes.Wolf3D_Outfit_Top.skeleton}
-      />
-    </group>
+    <>
+      <group {...props} ref={model} dispose={null}>
+        <group userData={{ name: "Armature" }}>
+          <primitive object={nodes.Hips} />
+          <skinnedMesh
+            geometry={nodes.Body_Mesh.geometry}
+            material={materials.Body}
+            skeleton={nodes.Body_Mesh.skeleton}
+            userData={{ name: "Body_Mesh" }}
+          />
+          <skinnedMesh
+            name="Eye_Mesh"
+            geometry={nodes.Eye_Mesh.geometry}
+            material={materials.Eyes}
+            skeleton={nodes.Eye_Mesh.skeleton}
+            morphTargetDictionary={nodes.Eye_Mesh.morphTargetDictionary}
+            morphTargetInfluences={nodes.Eye_Mesh.morphTargetInfluences}
+            userData={{
+              targetNames: [
+                "eyeLookDownLeft",
+                "eyeLookDownRight",
+                "eyeLookUpLeft",
+                "eyeLookUpRight",
+                "eyeLookInLeft",
+                "eyeLookInRight",
+                "eyeLookOutLeft",
+                "eyeLookOutRight",
+                "eyesClosed",
+                "eyesLookUp",
+                "eyesLookDown",
+              ],
+              name: "Eye_Mesh",
+            }}
+          />
+          <skinnedMesh
+            name="EyeAO_Mesh"
+            geometry={nodes.EyeAO_Mesh.geometry}
+            material={materials.EyeAO}
+            skeleton={nodes.EyeAO_Mesh.skeleton}
+            morphTargetDictionary={nodes.EyeAO_Mesh.morphTargetDictionary}
+            morphTargetInfluences={nodes.EyeAO_Mesh.morphTargetInfluences}
+            userData={{
+              targetNames: [
+                "browDownLeft",
+                "browDownRight",
+                "browInnerUp",
+                "browOuterUpLeft",
+                "browOuterUpRight",
+                "eyeSquintLeft",
+                "eyeSquintRight",
+                "noseSneerLeft",
+                "noseSneerRight",
+                "cheekPuff",
+                "cheekSquintLeft",
+                "cheekSquintRight",
+                "mouthSmile",
+                "mouthLeft",
+                "mouthRight",
+                "mouthSmileLeft",
+                "mouthSmileRight",
+                "eyeWideLeft",
+                "eyeWideRight",
+                "eyeLookDownLeft",
+                "eyeLookDownRight",
+                "eyeLookUpLeft",
+                "eyeLookUpRight",
+                "eyeLookInLeft",
+                "eyeLookInRight",
+                "eyeLookOutLeft",
+                "eyeLookOutRight",
+                "eyeBlinkLeft",
+                "eyeBlinkRight",
+                "eyesClosed",
+                "eyesLookUp",
+                "eyesLookDown",
+              ],
+              name: "EyeAO_Mesh",
+            }}
+          />
+          <skinnedMesh
+            name="Eyelash_Mesh"
+            geometry={nodes.Eyelash_Mesh.geometry}
+            material={materials.Eyelash}
+            skeleton={nodes.Eyelash_Mesh.skeleton}
+            morphTargetDictionary={nodes.Eyelash_Mesh.morphTargetDictionary}
+            morphTargetInfluences={nodes.Eyelash_Mesh.morphTargetInfluences}
+            userData={{
+              targetNames: [
+                "browDownLeft",
+                "browDownRight",
+                "browInnerUp",
+                "browOuterUpLeft",
+                "browOuterUpRight",
+                "eyeSquintLeft",
+                "eyeSquintRight",
+                "eyeWideLeft",
+                "eyeWideRight",
+                "noseSneerLeft",
+                "noseSneerRight",
+                "eyeLookDownLeft",
+                "eyeLookDownRight",
+                "eyeLookUpLeft",
+                "eyeLookUpRight",
+                "eyeLookInLeft",
+                "eyeLookInRight",
+                "eyeLookOutLeft",
+                "eyeLookOutRight",
+                "cheekSquintLeft",
+                "cheekSquintRight",
+                "eyeBlinkLeft",
+                "eyeBlinkRight",
+                "eyesClosed",
+                "eyesLookUp",
+                "eyesLookDown",
+                "mouthSmile",
+                "mouthSmileLeft",
+                "mouthSmileRight",
+                "mouthUpperUpLeft",
+                "mouthUpperUpRight",
+              ],
+              name: "Eyelash_Mesh",
+            }}
+          />
+          <skinnedMesh
+            name="Head_Mesh"
+            geometry={nodes.Head_Mesh.geometry}
+            material={materials.Head}
+            skeleton={nodes.Head_Mesh.skeleton}
+            morphTargetDictionary={nodes.Head_Mesh.morphTargetDictionary}
+            morphTargetInfluences={nodes.Head_Mesh.morphTargetInfluences}
+            userData={{
+              targetNames: [
+                "mouthOpen",
+                "viseme_sil",
+                "viseme_PP",
+                "viseme_FF",
+                "viseme_TH",
+                "eyeWideLeft",
+                "eyeWideRight",
+                "eyeLookDownLeft",
+                "eyeLookDownRight",
+                "eyeLookUpLeft",
+                "eyeLookUpRight",
+                "eyeLookInLeft",
+                "eyeLookInRight",
+                "eyeLookOutLeft",
+                "eyeLookOutRight",
+                "cheekSquintLeft",
+                "cheekSquintRight",
+                "mouthRollUpper",
+                "eyeBlinkLeft",
+                "eyeBlinkRight",
+                "eyesClosed",
+                "eyesLookUp",
+                "eyesLookDown",
+                "mouthClose",
+                "mouthFrownLeft",
+                "mouthFrownRight",
+                "mouthFunnel",
+                "mouthPressLeft",
+                "mouthPressRight",
+                "mouthStretchLeft",
+                "mouthStretchRight",
+                "tongueOut",
+                "mouthDimpleLeft",
+                "mouthDimpleRight",
+                "jawLeft",
+                "jawRight",
+                "eyeSquintLeft",
+                "eyeSquintRight",
+                "mouthLowerDownLeft",
+                "mouthLowerDownRight",
+                "mouthUpperUpLeft",
+                "mouthUpperUpRight",
+                "mouthSmileLeft",
+                "mouthSmileRight",
+                "mouthLeft",
+                "mouthRight",
+                "mouthPucker",
+                "mouthSmile",
+                "jawForward",
+                "jawOpen",
+                "mouthRollLower",
+                "cheekPuff",
+                "noseSneerRight",
+                "noseSneerLeft",
+                "mouthShrugLower",
+                "mouthShrugUpper",
+                "viseme_DD",
+                "viseme_kk",
+                "viseme_CH",
+                "viseme_SS",
+                "viseme_nn",
+                "viseme_RR",
+                "viseme_aa",
+                "viseme_E",
+                "viseme_I",
+                "viseme_O",
+                "viseme_U",
+                "browDownLeft",
+                "browDownRight",
+                "browInnerUp",
+                "browOuterUpLeft",
+                "browOuterUpRight",
+              ],
+              name: "Head_Mesh",
+            }}
+          />
+          <skinnedMesh
+            name="Teeth_Mesh"
+            geometry={nodes.Teeth_Mesh.geometry}
+            material={materials.Teeth}
+            skeleton={nodes.Teeth_Mesh.skeleton}
+            morphTargetDictionary={nodes.Teeth_Mesh.morphTargetDictionary}
+            morphTargetInfluences={nodes.Teeth_Mesh.morphTargetInfluences}
+            userData={{
+              targetNames: [
+                "mouthOpen",
+                "viseme_sil",
+                "viseme_PP",
+                "viseme_FF",
+                "viseme_TH",
+                "viseme_DD",
+                "viseme_kk",
+                "viseme_CH",
+                "viseme_SS",
+                "viseme_nn",
+                "viseme_RR",
+                "viseme_aa",
+                "viseme_E",
+                "viseme_I",
+                "viseme_O",
+                "viseme_U",
+                "jawOpen",
+                "jawForward",
+                "jawLeft",
+                "jawRight",
+              ],
+              name: "Teeth_Mesh",
+            }}
+          />
+          <skinnedMesh
+            name="Tongue_Mesh"
+            geometry={nodes.Tongue_Mesh.geometry}
+            material={materials.Teeth}
+            skeleton={nodes.Tongue_Mesh.skeleton}
+            morphTargetDictionary={nodes.Tongue_Mesh.morphTargetDictionary}
+            morphTargetInfluences={nodes.Tongue_Mesh.morphTargetInfluences}
+            userData={{
+              targetNames: [
+                "mouthOpen",
+                "viseme_sil",
+                "viseme_PP",
+                "viseme_FF",
+                "viseme_TH",
+                "viseme_DD",
+                "viseme_kk",
+                "viseme_CH",
+                "viseme_SS",
+                "viseme_nn",
+                "viseme_RR",
+                "viseme_aa",
+                "viseme_E",
+                "viseme_I",
+                "viseme_O",
+                "viseme_U",
+                "jawOpen",
+                "jawForward",
+                "jawLeft",
+                "jawRight",
+                "tongueOut",
+              ],
+              name: "Tongue_Mesh",
+            }}
+          />
+          <skinnedMesh
+            geometry={nodes.avaturn_hair_0.geometry}
+            material={materials.avaturn_hair_0_material}
+            skeleton={nodes.avaturn_hair_0.skeleton}
+            userData={{ name: "avaturn_hair_0" }}
+          />
+          {nodes.avaturn_hair_1 && (
+            <skinnedMesh
+              geometry={nodes.avaturn_hair_1.geometry}
+              material={materials.avaturn_hair_1_material}
+              skeleton={nodes.avaturn_hair_1.skeleton}
+              userData={{ name: "avaturn_hair_1" }}
+            />
+          )}
+          <skinnedMesh
+            geometry={nodes.avaturn_shoes_0.geometry}
+            material={materials.avaturn_shoes_0_material}
+            skeleton={nodes.avaturn_shoes_0.skeleton}
+            userData={{ name: "avaturn_shoes_0" }}
+          />
+          <skinnedMesh
+            geometry={nodes.avaturn_look_0.geometry}
+            material={materials.avaturn_look_0_material}
+            skeleton={nodes.avaturn_look_0.skeleton}
+            userData={{ name: "avaturn_look_0" }}
+          />
+        </group>
+      </group>
+    </>
   );
 }
-
-useGLTF.preload("/models/67ced08b15151efc82ffba2e.glb");
-useGLTF.preload("/models/animations.glb");
