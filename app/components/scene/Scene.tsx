@@ -43,7 +43,7 @@ export const Scene = () => {
   return (
     <>
       <CameraControls ref={cameraControls} />
-      <Environment preset="city" />
+      <Environment preset="dawn" background backgroundBlurriness={1} />
       {avatarUrl && <Avatar key={avatarUrl} url={avatarUrl} />}
       <ContactShadows opacity={0.7} />
     </>
