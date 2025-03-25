@@ -12,6 +12,8 @@ export const config = Object.freeze({
   LLM_MODEL: process.env.LLM_MODEL ?? "",
   SPEECH_API: process.env.SPEECH_API ?? "",
   AZURE_REGION: process.env.AZURE_REGION ?? "",
+  SUPABASE_URL: process.env.SUPABASE_URL!,
+  SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
 });
 
 export const OPEN_ROUTER_CONFIG = {};

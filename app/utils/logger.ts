@@ -6,8 +6,10 @@ const logger = pino({
     target: "pino-pretty",
     options: {
       colorize: true, // Enables color formatting for console output
+      translateTime: "yyyy-mm-dd HH:MM:ss",
     },
   },
 });
 
-export default logger;
+export const createLogger = (name: string) =>
+  logger.child({ name }, { msgPrefix: `[${name}] - ` });

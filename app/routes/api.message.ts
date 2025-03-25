@@ -7,10 +7,12 @@ import {
   SpeechSynthesizer,
 } from "microsoft-cognitiveservices-speech-sdk";
 import { config } from "~/utils/config";
-import logger from "~/utils/logger";
 import { readFileSync } from "node:fs";
 import { ILipSync } from "~/types/chat.type";
 import { sendChatMessage } from "~/services/chat.service";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("API Message");
 
 export const action: ActionFunction = async ({ request }) => {
   logger.info("Requesting message");

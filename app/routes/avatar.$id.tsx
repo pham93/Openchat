@@ -1,18 +1,16 @@
 import { Canvas } from "@react-three/fiber";
-import type { MetaFunction } from "@remix-run/node";
+import { redirect, type LoaderFunctionArgs } from "@remix-run/node";
 import { useEffect, useState } from "react";
 import { Chat } from "~/components/chat/Chat";
 import { ChatProvider } from "~/components/chat/ChatProvider";
 import { Scene } from "~/components/scene/Scene";
+import { authenticationGuard } from "~/services/auth.service";
 
-export const meta: MetaFunction = () => {
-  return [
-    { title: "Open Chat" },
-    { name: "description", content: "Chat with avatar" },
-  ];
-};
+export async function loader({ request }: LoaderFunctionArgs) {
+  return await authenticationGuard(request);
+}
 
-export default function Index() {
+export default function Avatar() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
