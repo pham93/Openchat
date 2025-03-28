@@ -14,6 +14,7 @@ export const config = Object.freeze({
   AZURE_REGION: process.env.AZURE_REGION ?? "",
   SUPABASE_URL: process.env.SUPABASE_URL!,
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
+  AVATURN_URL: process.env.AVATURN_URL!,
 });
 
 export const OPEN_ROUTER_CONFIG = {};

@@ -56,7 +56,10 @@ export default function SignupPage() {
     <>
       <CardHeader>
         <CardTitle>Sign up</CardTitle>
-        <CardDescription>Sign up for an account</CardDescription>
+        <CardDescription>
+          Sign up for an account
+          <p className="text-red-400">{actionData?.error?.message}</p>
+        </CardDescription>
       </CardHeader>
       <Form {...form}>
         <RemixForm method="post">

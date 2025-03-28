@@ -37,11 +37,11 @@ export async function action({ request }: ActionFunctionArgs) {
     result
   );
 
-  if (data.session && data.user?.email_confirmed_at) {
-    return redirect("/avatar", { headers: responseHeaders });
+  if (data?.session && data?.user?.email_confirmed_at && !signinError) {
+    return redirect("/create", { headers: responseHeaders });
   }
 
-  return actionResponse({ error: signinError }, { headers: responseHeaders });
+  return actionResponse({ error: signinError });
 }
 
 export default function LoginPage() {
@@ -70,7 +70,11 @@ export default function LoginPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormControl>
-                    <Input placeholder="Provide email" {...field} />
+                    <Input
+                      placeholder="Provide email"
+                      {...field}
+                      autoComplete="true"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -85,6 +89,7 @@ export default function LoginPage() {
                     <Input
                       placeholder="Provide password"
                       type="password"
+                      autoComplete="current-password"
                       {...field}
                     />
                   </FormControl>

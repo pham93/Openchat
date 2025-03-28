@@ -11,6 +11,7 @@ import type { LinksFunction } from "@remix-run/node";
 import "./tailwind.css";
 import { config } from "./utils/config";
 import { SupabaseClientProvider } from "./lib/supabase/superbase.provider";
+import { useState } from "react";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "/cover.jgp", as: "image" },

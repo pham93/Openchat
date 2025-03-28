@@ -15,7 +15,7 @@ export async function signup(request: Request, { email, password }: IUser) {
     email,
     password,
     options: {
-      emailRedirectTo: `${url.origin}/auth/confirm`,
+      emailRedirectTo: `${url.origin}/confirm`,
     },
   });
 
@@ -39,43 +39,42 @@ export async function signin(
   });
 
   if (error) {
-    return { data, error };
+    return actionResponse({ data, error });
   }
 
-  if (!data.user?.email_confirmed_at) {
+  if (!data.user?.email_confirmed_at || !data.user.email) {
     return { error: new Error("User not yet verified"), data };
   }
 
-  return { data, error };
+  return actionResponse({ data, error });
 }
 
-export async function confirmEmail(
-  request: Request
-): Promise<{ success: boolean; message?: string }> {
+export async function confirmEmail(request: Request) {
   const url = new URL(request.url);
   const headers = new Headers();
   const token = url.searchParams.get("token");
   const type = url.searchParams.get("type");
 
-  if (token && type === "signup") {
-    const { data: userData } = await getSupabaseServerClient(
+  if (token && type === "email") {
+    const { data: userData, error } = await getSupabaseServerClient(
       request,
       headers
     ).auth.verifyOtp({
       token_hash: token,
       type,
     });
-    if (userData.session) {
-      logger.info("[Signup] Successfully verify user");
-      return { success: true };
+
+    if (userData.session?.user) {
+      logger.info({ user: userData.session.user }, "Successfully verify user");
+      return redirect("/avatar", { headers });
     }
+    logger.error(error);
   }
-  return {
-    success: false,
-    message:
-      url.searchParams.get("error_description") ??
-      "Error with confirmation link",
-  };
+
+  return actionResponse(
+    { error: { message: "Error with confirmation link or expired" } },
+    { status: 403 }
+  );
 }
 
 export async function getUser(request: Request) {
@@ -86,7 +85,7 @@ export async function authenticationGuard(
   request: Request,
   headers = new Headers()
 ) {
-  logger.debug("Verifying user session");
+  logger.info("Verifying user session");
   // don't use getSession on the server due to cookies can be tampered
   const { data, error } = await getSupabaseServerClient(
     request,

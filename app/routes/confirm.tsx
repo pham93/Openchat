@@ -3,22 +3,14 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle,
 } from "~/components/ui/card";
-import {
-  ActionFunctionArgs,
-  data,
-  LoaderFunctionArgs,
-  redirect,
-} from "@remix-run/node";
+import { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { confirmEmail } from "~/services/auth.service";
 import {
   Form as RemixForm,
   useActionData,
   useLoaderData,
-  useNavigation,
 } from "@remix-run/react";
-import { Button } from "~/components/ui/button";
 import {
   FormField,
   FormItem,
@@ -31,57 +23,49 @@ import { IUser, userSchema } from "~/types/user.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "~/components/ui/input";
 import { getSupabaseServerClient } from "~/lib/supabase/supabase.server";
-import { tryCatch } from "~/utils/tryCatch";
+import { SubmitButton } from "~/components/ui/submitButton";
+import { validate } from "~/utils/validate";
+import { actionResponse } from "~/utils/actionResponse";
+import { z } from "zod";
+
+const emailSchema = z.object({ email: userSchema.shape["email"] });
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { success, message } = await confirmEmail(request);
-  if (success) {
-    return redirect("/");
-  }
-  return data(message, { status: 400 });
+  return await confirmEmail(request);
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const payload = Object.fromEntries(await request.formData());
-  const { result } = tryCatch(() =>
-    userSchema.shape["email"].parse(payload.email)
-  );
-  if (result) {
-    const { error } = await getSupabaseServerClient(
-      request,
-      new Headers()
-    ).auth.resend({
-      email: result,
-      type: "signup",
-    });
+  const result = await validate(request, emailSchema);
+  const { error } = await getSupabaseServerClient(request).auth.resend({
+    email: result.email,
+    type: "signup",
+  });
 
-    if (error) {
-      return { error: error.message, success: null };
-    }
-    return { success: "Verification sent!", error: null };
+  if (error) {
+    return actionResponse({ error }, { status: 400 });
   }
-  return { error: "error sending request", success: null };
+  return actionResponse({ data: "Successfully resend" });
 }
 
 export default function ConfirmPage() {
   const loaderData = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-  const navigation = useNavigation();
 
-  const form = useForm<IUser>({
-    resolver: zodResolver(userSchema),
-    defaultValues: { email: "", password: "" },
+  const form = useForm<{ email: string }>({
+    resolver: zodResolver(emailSchema),
+    defaultValues: { email: "" },
     mode: "onChange",
   });
 
   return (
     <>
       <CardHeader>
-        <CardTitle>Signup</CardTitle>
-        <CardDescription className="text-red-400">{loaderData}</CardDescription>
-        {actionData?.success && (
+        <CardDescription className="text-red-400">
+          {loaderData?.error?.message}
+        </CardDescription>
+        {actionData?.data && (
           <div className="w-full h-[100px] rounded-md bg-green-300">
-            {actionData.success}
+            {actionData.data}
           </div>
         )}
       </CardHeader>
@@ -102,9 +86,7 @@ export default function ConfirmPage() {
             ></FormField>
           </CardContent>
           <CardFooter className="flex justify-end">
-            <Button type="submit" disabled={navigation.state === "submitting"}>
-              Resend
-            </Button>
+            <SubmitButton valid={form.formState.isValid}>Resend</SubmitButton>
           </CardFooter>
         </RemixForm>
       </Form>

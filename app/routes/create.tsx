@@ -1,25 +1,37 @@
 import { AvaturnSDK } from "@avaturn/sdk";
-import { useNavigate } from "@remix-run/react";
+import { LoaderFunctionArgs } from "@remix-run/node";
+import { useLoaderData, useNavigate } from "@remix-run/react";
 import { useEffect, useRef } from "react";
+import { useSupabaseClient } from "~/lib/supabase/superbase.provider";
+import { authenticationGuard } from "~/services/auth.service";
+import { config } from "~/utils/config";
 import { getIndexedDb } from "~/utils/indexedDB.client";
+import { tryCatch } from "~/utils/tryCatch";
 
-function createBlob(base64Url: string) {
-  const base64 = base64Url.split(",")[1];
-  const bytes = atob(base64);
-  const byteNumbers = new Array(bytes.length);
+async function getModel(url: string) {
+  const response = await fetch(url, { redirect: "follow" });
+  return await response.blob();
+}
 
-  for (let i = 0; i < bytes.length; i++) {
-    byteNumbers[i] = bytes.charCodeAt(i);
-  }
-  const byteArray = new Uint8Array(byteNumbers);
+export async function loader({ request }: LoaderFunctionArgs) {
+  await authenticationGuard(request);
+  const url = new URL(request.url);
+  const avatarId = url.searchParams.get("avatarId");
+  // validate the avatar belongs to this user
 
-  return new Blob([byteArray], { type: "model/gltf-binary" });
+  const path = avatarId ? `editor?customization_id=${avatarId}` : "";
+  return {
+    url: `${config.AVATURN_URL}/${path}`,
+  };
 }
 
 export default function Create() {
   const ref = useRef<HTMLDivElement | null>(null);
 
+  const { url } = useLoaderData<typeof loader>();
+
   const clientNavigate = useNavigate();
+  const supabase = useSupabaseClient();
 
   useEffect(() => {
     if (!ref.current) {
@@ -32,19 +44,30 @@ export default function Create() {
     const sdk = new AvaturnSDK();
     sdk.init(ref.current, {
       disableUi: false,
-      url: "https://chatty.avaturn.dev/editor?customization_id=01957fb7-db94-7365-b998-f0215352e0ed",
+      url,
     });
 
-    sdk.on("export", async (e) => {
-      try {
-        const blob = createBlob(e.url);
-        await getIndexedDb().avatars.put({ avatarId: e.avatarId, model: blob });
-        clientNavigate(`/${e.avatarId}`);
-      } catch (e) {
-        console.error(e);
+    sdk.on("export", async ({ avatarId, url, ...other }) => {
+      const { error } = tryCatch(async () => {
+        if (other.urlType !== "httpURL") {
+          return;
+        }
+        const blob = await getModel(url);
+        await getIndexedDb().avatars.put({
+          avatarId,
+          model: blob,
+          lastModified: new Date().getMilliseconds(),
+          sourceUrl: url,
+        });
+      });
+      if (error) {
+        console.error(error);
+        return;
       }
+      clientNavigate(`/avatar/${avatarId}`);
     });
-  }, [clientNavigate]);
+    return () => sdk.destroy();
+  }, [clientNavigate, url, supabase]);
 
   return <div className="h-screen" ref={ref}></div>;
 }

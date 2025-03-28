@@ -1,5 +1,5 @@
 import { ContactShadows, Environment, CameraControls } from "@react-three/drei";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Avatar } from "./Avatar";
 import { useControls } from "leva";
 import { getIndexedDb, LocalAvatar } from "~/utils/indexedDB.client";
@@ -43,8 +43,10 @@ export const Scene = () => {
   return (
     <>
       <CameraControls ref={cameraControls} />
-      <Environment preset="dawn" background backgroundBlurriness={1} />
-      {avatarUrl && <Avatar key={avatarUrl} url={avatarUrl} />}
+      <Environment background preset="dawn" backgroundBlurriness={1} />
+      <Suspense fallback={<group />}>
+        {avatarUrl && <Avatar key={avatarUrl} url={avatarUrl} />}
+      </Suspense>
       <ContactShadows opacity={0.7} />
     </>
   );

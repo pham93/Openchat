@@ -2,7 +2,9 @@ import { EntityTable, Dexie } from "dexie";
 
 export interface LocalAvatar {
   avatarId: string;
+  lastModified: number;
   model: Blob;
+  sourceUrl: string;
 }
 
 const isClient = typeof window !== "undefined";

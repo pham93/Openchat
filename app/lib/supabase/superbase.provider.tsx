@@ -8,13 +8,15 @@ import {
   useEffect,
   useMemo,
 } from "react";
-import { tryCatch } from "~/utils/tryCatch";
+import { Database } from "supabase/database.types";
 
-const SupabaseContext = createContext<{ supabase?: SupabaseClient }>({});
+const SupabaseContext = createContext<{ supabase?: SupabaseClient<Database> }>(
+  {}
+);
 
 export const useSupabaseClient = () => {
   const context = useContext(SupabaseContext);
-  if (!context) {
+  if (!context?.supabase) {
     throw new Error("No available SupabaseClientProvider");
   }
   return context.supabase;
@@ -26,7 +28,7 @@ export const SupabaseClientProvider = ({
   anonKey,
 }: PropsWithChildren & { url: string; anonKey: string }) => {
   const supabase = useMemo(
-    () => createBrowserClient(url, anonKey),
+    () => createBrowserClient<Database>(url, anonKey),
     [url, anonKey]
   );
 
@@ -35,13 +37,16 @@ export const SupabaseClientProvider = ({
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
+    } = supabase.auth.onAuthStateChange((e) => {
+      if (e === "INITIAL_SESSION" || e === "SIGNED_IN") {
+        return;
+      }
       console.debug("Revalidate due to auth state changes");
       revalidator.revalidate();
     });
     return () => subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase]);
+  }, []);
 
   return (
     <SupabaseContext.Provider value={{ supabase }}>

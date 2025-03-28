@@ -8,7 +8,8 @@
     "dev": "remix vite:dev",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "start": "remix-serve ./build/server/index.js",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "supabase": "supabase"
   },
   "dependencies": {
     "@avaturn/sdk": "^1.1.4",
@@ -59,6 +60,7 @@
     "pino-pretty": "^13.0.0",
     "postcss": "^8.4.38",
     "remix-flat-routes": "^0.8.5",
+    "supabase": "^2.20.3",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.1.6",
     "vite": "^6.0.0",
