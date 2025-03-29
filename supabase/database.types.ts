@@ -9,56 +9,53 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      Avatar: {
+      avatar: {
         Row: {
-          conversation: Json | null;
           created_at: string;
           id: string;
-          modified_at: string | null;
-          prompt: string | null;
+          name: string | null;
           source_url: string | null;
+          traits: Json | null;
           user_id: string | null;
         };
         Insert: {
-          conversation?: Json | null;
           created_at?: string;
           id: string;
-          modified_at?: string | null;
-          prompt?: string | null;
+          name?: string | null;
           source_url?: string | null;
+          traits?: Json | null;
           user_id?: string | null;
         };
         Update: {
-          conversation?: Json | null;
           created_at?: string;
           id?: string;
-          modified_at?: string | null;
-          prompt?: string | null;
+          name?: string | null;
           source_url?: string | null;
+          traits?: Json | null;
           user_id?: string | null;
         };
         Relationships: [
           {
-            foreignKeyName: "Avatar_user_id_fkey";
+            foreignKeyName: "avatar_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
-            referencedRelation: "User";
-            referencedColumns: ["id"];
+            referencedRelation: "user";
+            referencedColumns: ["auth_id"];
           }
         ];
       };
-      User: {
+      user: {
         Row: {
+          auth_id: string;
           email: string;
-          id: string;
         };
         Insert: {
+          auth_id: string;
           email: string;
-          id: string;
         };
         Update: {
+          auth_id?: string;
           email?: string;
-          id?: string;
         };
         Relationships: [];
       };

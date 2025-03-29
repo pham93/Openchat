@@ -2,13 +2,13 @@ import { ContactShadows, Environment, CameraControls } from "@react-three/drei";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Avatar } from "./Avatar";
 import { useControls } from "leva";
-import { getIndexedDb, LocalAvatar } from "~/utils/indexedDB.client";
+import { type LocalAvatar } from "~/utils/indexedDB.client";
+import { useParams } from "@remix-run/react";
 
-export const Scene = () => {
+export const Scene = ({ avatars }: { avatars: LocalAvatar[] }) => {
   const cameraControls = useRef<CameraControls | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string>("");
-
-  const [avatars, setAvatars] = useState<LocalAvatar[]>([]);
+  const { id } = useParams();
 
   useEffect(() => {
     cameraControls.current?.setLookAt(
@@ -21,15 +21,11 @@ export const Scene = () => {
     );
   }, [cameraControls]);
 
-  useEffect(() => {
-    getIndexedDb().avatars.toArray().then(setAvatars);
-  }, []);
-
   useControls(
     "Change Avatar",
     {
       models: {
-        value: "my id",
+        value: id,
         options: avatars.map((e) => e.avatarId),
         onChange: (val: string) => {
           const avatar = avatars.find((e) => e.avatarId === val);

@@ -4,34 +4,37 @@ import { useLoaderData, useNavigate } from "@remix-run/react";
 import { useEffect, useRef } from "react";
 import { useSupabaseClient } from "~/lib/supabase/superbase.provider";
 import { authenticationGuard } from "~/services/auth.service";
+import { getAvatars } from "~/services/avatar.service";
 import { config } from "~/utils/config";
-import { getIndexedDb } from "~/utils/indexedDB.client";
+import { storeAvatarLocally } from "~/utils/indexedDB.client";
 import { tryCatch } from "~/utils/tryCatch";
 
-async function getModel(url: string) {
-  const response = await fetch(url, { redirect: "follow" });
-  return await response.blob();
-}
-
 export async function loader({ request }: LoaderFunctionArgs) {
-  await authenticationGuard(request);
+  const user = await authenticationGuard(request);
   const url = new URL(request.url);
+  let path = "";
   const avatarId = url.searchParams.get("avatarId");
   // validate the avatar belongs to this user
-
-  const path = avatarId ? `editor?customization_id=${avatarId}` : "";
+  if (!avatarId) {
+    const { data: avatars } = await getAvatars(request, user.id);
+    path = avatars && avatars.length > 0 ? "" : "create/scan";
+    console.log(avatars);
+  } else {
+    path = `editor?customization_id=${avatarId}`;
+  }
   return {
     url: `${config.AVATURN_URL}/${path}`,
+    user,
   };
 }
 
 export default function Create() {
   const ref = useRef<HTMLDivElement | null>(null);
-
-  const { url } = useLoaderData<typeof loader>();
+  const { url, user } = useLoaderData<typeof loader>();
 
   const clientNavigate = useNavigate();
-  const supabase = useSupabaseClient();
+
+  const { supabase } = useSupabaseClient();
 
   useEffect(() => {
     if (!ref.current) {
@@ -41,6 +44,7 @@ export default function Create() {
 
   useEffect(() => {
     // is client
+
     const sdk = new AvaturnSDK();
     sdk.init(ref.current, {
       disableUi: false,
@@ -52,13 +56,17 @@ export default function Create() {
         if (other.urlType !== "httpURL") {
           return;
         }
-        const blob = await getModel(url);
-        await getIndexedDb().avatars.put({
-          avatarId,
-          model: blob,
-          lastModified: new Date().getMilliseconds(),
-          sourceUrl: url,
+        const { error: dbError } = await supabase.from("avatar").upsert({
+          id: avatarId,
+          user_id: user.id,
+          source_url: url,
         });
+
+        if (dbError) {
+          console.error(error);
+          return dbError;
+        }
+        await storeAvatarLocally({ sourceUrl: url, avatarId, userId: user.id });
       });
       if (error) {
         console.error(error);
@@ -67,7 +75,8 @@ export default function Create() {
       clientNavigate(`/avatar/${avatarId}`);
     });
     return () => sdk.destroy();
-  }, [clientNavigate, url, supabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return <div className="h-screen" ref={ref}></div>;
 }

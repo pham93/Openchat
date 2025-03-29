@@ -27,18 +27,14 @@ import { validate } from "~/utils/validate";
 const logger = createLogger("LoginPage");
 
 export async function action({ request }: ActionFunctionArgs) {
-  const responseHeaders = new Headers();
+  const headers = new Headers();
   const result = await validate(request, userLoginSchema);
 
   logger.info(`Logging in as ${result.email}`);
-  const { data, error: signinError } = await signin(
-    request,
-    responseHeaders,
-    result
-  );
+  const { data, error: signinError } = await signin(request, headers, result);
 
   if (data?.session && data?.user?.email_confirmed_at && !signinError) {
-    return redirect("/create", { headers: responseHeaders });
+    return redirect("/avatar", { headers });
   }
 
   return actionResponse({ error: signinError });

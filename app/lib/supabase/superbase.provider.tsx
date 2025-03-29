@@ -1,6 +1,6 @@
 import { useRevalidator } from "@remix-run/react";
 import { createBrowserClient } from "@supabase/ssr";
-import { SupabaseClient } from "@supabase/supabase-js";
+import { SupabaseClient, User } from "@supabase/supabase-js";
 import {
   createContext,
   PropsWithChildren,
@@ -10,16 +10,16 @@ import {
 } from "react";
 import { Database } from "supabase/database.types";
 
-const SupabaseContext = createContext<{ supabase?: SupabaseClient<Database> }>(
-  {}
-);
+const SupabaseContext = createContext<{
+  supabase?: SupabaseClient<Database>;
+}>({});
 
 export const useSupabaseClient = () => {
   const context = useContext(SupabaseContext);
   if (!context?.supabase) {
     throw new Error("No available SupabaseClientProvider");
   }
-  return context.supabase;
+  return { supabase: context.supabase };
 };
 
 export const SupabaseClientProvider = ({
@@ -37,10 +37,19 @@ export const SupabaseClientProvider = ({
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((e) => {
-      if (e === "INITIAL_SESSION" || e === "SIGNED_IN") {
+    } = supabase.auth.onAuthStateChange((e, session) => {
+      if (e === "SIGNED_IN") {
+        sessionStorage.setItem("user_id", `${session?.user.id}`);
         return;
       }
+      if (e === "SIGNED_OUT") {
+        sessionStorage.removeItem("user_id");
+      }
+
+      if (e === "INITIAL_SESSION") {
+        return;
+      }
+
       console.debug("Revalidate due to auth state changes");
       revalidator.revalidate();
     });
