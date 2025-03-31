@@ -3,12 +3,19 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { Avatar } from "./Avatar";
 import { useControls } from "leva";
 import { type LocalAvatar } from "~/utils/indexedDB.client";
-import { useParams } from "@remix-run/react";
+import { useNavigate, useParams } from "@remix-run/react";
 
-export const Scene = ({ avatars }: { avatars: LocalAvatar[] }) => {
+export const Scene = ({
+  avatars,
+  avatar,
+}: {
+  avatars: LocalAvatar[];
+  avatar?: LocalAvatar;
+}) => {
   const cameraControls = useRef<CameraControls | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string>("");
   const { id } = useParams();
+  const navigate = useNavigate();
 
   useEffect(() => {
     cameraControls.current?.setLookAt(
@@ -28,13 +35,21 @@ export const Scene = ({ avatars }: { avatars: LocalAvatar[] }) => {
         value: id,
         options: avatars.map((e) => e.avatarId),
         onChange: (val: string) => {
-          const avatar = avatars.find((e) => e.avatarId === val);
-          avatar && setAvatarUrl(URL.createObjectURL(avatar.model));
+          if (val !== id) {
+            navigate({ pathname: `/avatar/${val}` }, { replace: true });
+          }
         },
       },
     },
-    [avatars]
+    [avatars, id]
   );
+
+  useEffect(() => {
+    if (!avatar?.model) {
+      return;
+    }
+    setAvatarUrl(URL.createObjectURL(avatar.model));
+  }, [avatar]);
 
   return (
     <>

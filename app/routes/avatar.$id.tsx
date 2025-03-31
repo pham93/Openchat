@@ -1,77 +1,107 @@
 import { Canvas } from "@react-three/fiber";
-import { type LoaderFunctionArgs } from "@remix-run/node";
-import { ClientLoaderFunctionArgs, useLoaderData } from "@remix-run/react";
+import { useNavigate, useOutletContext, useParams } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { Chat } from "~/components/chat/Chat";
 import { ChatProvider } from "~/components/chat/ChatProvider";
 import { Scene } from "~/components/scene/Scene";
-import { authenticationGuard } from "~/services/auth.service";
-import { getAvatar } from "~/services/avatar.service";
-import { actionResponse } from "~/utils/actionResponse";
-import { getIndexedDb, storeAvatarLocally } from "~/utils/indexedDB.client";
+import {
+  getIndexedDb,
+  LocalAvatar,
+  storeAvatarLocally,
+} from "~/utils/indexedDB.client";
 import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("Avatar.$id");
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  await authenticationGuard(request);
-  const avatarId = params.id;
-  if (!avatarId) {
-    throw "done";
+const preloadAvatar = async (avatar: LocalAvatar) => {
+  const cached = await getIndexedDb().avatars.get(avatar.avatarId);
+  if (cached?.model) {
+    return Promise.resolve(cached);
   }
-  logger.info({ avatarId }, "Retrieving avatar from server");
-  const { data: avatar, error: avatarRetrievalError } = await getAvatar(
-    request,
-    avatarId
-  );
-
-  if (avatarRetrievalError) {
-    logger.error(avatarRetrievalError);
-    throw "done";
-  }
-  return actionResponse(
-    { data: avatar, error: avatarRetrievalError },
-    { headers: { "Cache-Control": "max-age=3600" } }
-  );
-}
-
-export const clientLoader = async ({
-  serverLoader,
-}: ClientLoaderFunctionArgs) => {
-  const { data, error } = await serverLoader<typeof loader>();
-
-  if (!data || error) {
-    throw "done";
-  }
-  const cachedAvatar = await getIndexedDb().avatars.get(data.id);
-
-  if (!cachedAvatar && data.source_url && data.user_id) {
-    logger.info(
-      `${data.id} not in cached. Proceed to download and store locally`
-    );
-    await storeAvatarLocally({
-      sourceUrl: data.source_url,
-      avatarId: data.id,
-      userId: data.user_id,
-    });
-  }
-  const avatars = await getIndexedDb()
-    .avatars.where({ userId: data.user_id })
-    .toArray();
-
-  return { data: { avatars } };
+  await storeAvatarLocally({
+    avatarId: avatar.avatarId,
+    sourceUrl: avatar.sourceUrl,
+    userId: avatar.userId,
+  });
+  return await getIndexedDb().avatars.get(avatar.avatarId);
 };
 
-clientLoader.hydrate = true;
+// export async function loader({ request, params }: LoaderFunctionArgs) {
+//   const avatarId = params.id;
+//   if (!avatarId) {
+//     throw "done";
+//   }
+//   logger.info({ avatarId }, "Retrieving avatar from server");
+//   const { data: avatar, error: avatarRetrievalError } = await getAvatar(
+//     request,
+//     avatarId
+//   );
+
+//   if (avatarRetrievalError) {
+//     logger.error(avatarRetrievalError);
+//     throw "done";
+//   }
+
+//   return actionResponse({ data: { avatar }, error: avatarRetrievalError });
+// }
+
+// export const clientLoader = async ({
+//   serverLoader,
+//   params,
+// }: ClientLoaderFunctionArgs) => {
+//   let cachedAvatar = await getIndexedDb().avatars.get(params.id as string);
+
+//   if (cachedAvatar) {
+//     return { data: { cachedAvatar } };
+//   }
+
+//   const { data } = await serverLoader<typeof loader>();
+
+//   const avatar = data?.avatar;
+//   if (avatar) {
+//     logger.info(
+//       `${avatar.id} not in cached. Proceed to download and store locally`
+//     );
+//     await storeAvatarLocally({
+//       sourceUrl: avatar.source_url!,
+//       avatarId: avatar.id,
+//       userId: avatar.user_id!,
+//     });
+//     cachedAvatar = await getIndexedDb().avatars.get(avatar.id);
+//   }
+
+//   return { data: { cachedAvatar } };
+// };
+
+// clientLoader.hydrate = true;
 
 export default function Avatar() {
   const [isClient, setIsClient] = useState(false);
+  const { id } = useParams();
+  const { avatars } = useOutletContext<{ avatars: LocalAvatar[] }>();
+  const navigate = useNavigate();
 
-  const { data } = useLoaderData<typeof clientLoader>();
+  const [cachedAvatar, setCachedAvatar] = useState<LocalAvatar>();
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    const avatar = avatars.find((e) => e.avatarId === id);
+    if (!avatar) {
+      // navigate("/avatar", { replace: true });
+      return;
+    }
+
+    preloadAvatar(avatar).then((e) => {
+      setCachedAvatar(e);
+      // load the rest, don't wait
+      Promise.allSettled(
+        avatars.filter((e) => e.avatarId !== id).map((e) => preloadAvatar(e))
+      ).then();
+    });
+  }, [avatars, id]);
 
   return (
     <>
@@ -79,7 +109,7 @@ export default function Avatar() {
         <ChatProvider>
           <Chat />
           <Canvas shadows camera={{ position: [0, 0, 1], fov: 30 }}>
-            <Scene avatars={data.avatars} />
+            {cachedAvatar && <Scene avatars={avatars} avatar={cachedAvatar} />}
           </Canvas>
         </ChatProvider>
       )}

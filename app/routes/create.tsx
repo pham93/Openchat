@@ -18,7 +18,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (!avatarId) {
     const { data: avatars } = await getAvatars(request, user.id);
     path = avatars && avatars.length > 0 ? "" : "create/scan";
-    console.log(avatars);
   } else {
     path = `editor?customization_id=${avatarId}`;
   }

@@ -3,7 +3,7 @@ import { EntityTable, Dexie } from "dexie";
 export interface LocalAvatar {
   avatarId: string;
   lastModified: number;
-  model: Blob;
+  model?: Blob;
   sourceUrl: string;
   userId: string;
 }
@@ -43,10 +43,9 @@ export async function storeAvatarLocally({
   avatarId: string;
   userId: string;
 }) {
-  const blob = await getModel(sourceUrl);
   await getIndexedDb().avatars.put({
     avatarId,
-    model: blob,
+    model: await getModel(sourceUrl),
     lastModified: new Date().getMilliseconds(),
     sourceUrl,
     userId,
